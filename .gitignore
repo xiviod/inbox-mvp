@@ -1,0 +1,13 @@
+node_modules
+backend/node_modules
+frontend/node_modules
+.env
+backend/.env
+frontend/.env
+logs/*
+!logs/.gitkeep
+backend/prisma/dev.db
+.DS_Store
+dist
+frontend/dist
+
