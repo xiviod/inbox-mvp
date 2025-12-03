@@ -3,11 +3,12 @@ const adapters = require('../adapters');
 const logger = require('../logger');
 const config = require('../config');
 const metaSignature = require('../middleware/metaSignature');
+const telegramSecret = require('../middleware/telegramSecret');
 const { processUnifiedMessage } = require('../services/messageService');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
+const verifyHandler = (req, res) => {
   const mode = req.query['hub.mode'];
   const verifyToken = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -19,7 +20,12 @@ router.get('/', (req, res) => {
 
   logger.log('webhook_verify_failed', { mode, verifyToken });
   return res.sendStatus(403);
-});
+};
+
+router.get('/', verifyHandler);
+router.get('/whatsapp', verifyHandler);
+router.get('/instagram', verifyHandler);
+router.get('/messenger', verifyHandler);
 
 const inboundHandler =
   (channel) =>
@@ -55,6 +61,7 @@ const inboundHandler =
 router.post('/whatsapp', metaSignature, inboundHandler('whatsapp'));
 router.post('/instagram', metaSignature, inboundHandler('instagram'));
 router.post('/messenger', metaSignature, inboundHandler('messenger'));
+router.post('/telegram', telegramSecret, inboundHandler('telegram'));
 
 module.exports = router;
 

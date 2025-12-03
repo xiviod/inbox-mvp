@@ -9,15 +9,36 @@ const requiredForProd = [
   'FB_APP_SECRET',
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_TOKEN',
-  'FB_PAGE_ACCESS_TOKEN'
+  'FB_PAGE_ACCESS_TOKEN',
+  'TELEGRAM_BOT_TOKEN'
 ];
 
-const missing = requiredForProd.filter((key) => !process.env[key]);
-if (missing.length) {
+const recommendedForProd = [
+  'OBS_ENDPOINT',
+  'OBS_BUCKET',
+  'OBS_REGION',
+  'OBS_ACCESS_KEY',
+  'OBS_SECRET_KEY',
+  'DCS_REDIS_HOST',
+  'AI_ASSIST_ENDPOINT',
+  'AI_ASSIST_TOKEN'
+];
+
+const missingRequired = requiredForProd.filter((key) => !process.env[key]);
+if (missingRequired.length) {
   console.warn(
-    `[config] Missing env vars: ${missing.join(
+    `[config] Missing required env vars: ${missingRequired.join(
       ', '
     )}. The server will start, but webhook verification or outbound sending may fail until they are provided.`
+  );
+}
+
+const missingRecommended = recommendedForProd.filter((key) => !process.env[key]);
+if (missingRecommended.length) {
+  console.warn(
+    `[config] Missing recommended Huawei Cloud env vars: ${missingRecommended.join(
+      ', '
+    )}. Related integrations (OBS/DCS/AI) will be skipped until they are provided.`
   );
 }
 
@@ -35,6 +56,37 @@ module.exports = {
   },
   facebook: {
     pageAccessToken: process.env.FB_PAGE_ACCESS_TOKEN || ''
+  },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    secretToken: process.env.TELEGRAM_WEBHOOK_SECRET || ''
+  },
+  obs: {
+    endpoint: process.env.OBS_ENDPOINT || '',
+    region: process.env.OBS_REGION || '',
+    bucket: process.env.OBS_BUCKET || '',
+    accessKey: process.env.OBS_ACCESS_KEY || '',
+    secretKey: process.env.OBS_SECRET_KEY || ''
+  },
+  cache: {
+    host: process.env.DCS_REDIS_HOST || '',
+    port: Number(process.env.DCS_REDIS_PORT) || 6379,
+    password: process.env.DCS_REDIS_PASSWORD || '',
+    tls: process.env.DCS_REDIS_TLS === 'true'
+  },
+  ai: {
+    endpoint: process.env.AI_ASSIST_ENDPOINT || '',
+    token: process.env.AI_ASSIST_TOKEN || '',
+    timeoutMs: Number(process.env.AI_ASSIST_TIMEOUT_MS) || 15000
+  },
+  lts: {
+    enabled: process.env.LTS_ENABLED === 'true',
+    endpoint: process.env.LTS_ENDPOINT || '',
+    projectId: process.env.LTS_PROJECT_ID || '',
+    logGroup: process.env.LTS_LOG_GROUP || '',
+    logStream: process.env.LTS_LOG_STREAM || '',
+    accessKey: process.env.LTS_ACCESS_KEY || '',
+    secretKey: process.env.LTS_SECRET_KEY || ''
   },
   loggingDir: path.join(__dirname, '..', '..', 'logs')
 };

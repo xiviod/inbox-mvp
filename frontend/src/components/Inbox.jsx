@@ -40,6 +40,12 @@ const Inbox = () => {
   const [sending, setSending] = useState(false);
   const [socketStatus, setSocketStatus] = useState('disconnected');
 
+  const [aiResponse, setAiResponse] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [inventorySearch, setInventorySearch] = useState('');
+
   const selectedConversation = useMemo(
     () => conversations.find((c) => c.conversation_id === selectedId),
     [conversations, selectedId]
@@ -61,15 +67,37 @@ const Inbox = () => {
     setMessages(res.data || []);
   };
 
+  const loadOrders = async (conversationId) => {
+    if (!conversationId) {
+      setOrders([]);
+      return;
+    }
+    const res = await api.get('/api/orders', {
+      params: { conversation_id: conversationId }
+    });
+    setOrders(res.data || []);
+  };
+
+  const loadInventory = async (term = '') => {
+    const res = await api.get('/api/inventory', {
+      params: term ? { search: term } : undefined
+    });
+    setInventory(res.data || []);
+  };
+
   useEffect(() => {
     loadConversations();
+    loadInventory();
   }, []);
 
   useEffect(() => {
     if (selectedId) {
       loadMessages(selectedId);
+      loadOrders(selectedId);
+      setAiResponse(null);
     } else {
       setMessages([]);
+      setOrders([]);
     }
   }, [selectedId]);
 
@@ -98,9 +126,11 @@ const Inbox = () => {
   const handleSend = async (event) => {
     event.preventDefault();
     if (!draft.trim() || !selectedConversation) return;
-    const recipient =
-      selectedConversation.platform_user_id ||
-      selectedConversation.conversation_id?.split(':')[1];
+    const isTelegram = selectedConversation.channel === 'telegram';
+    const recipient = isTelegram
+      ? selectedConversation.conversation_id?.split(':')[1]
+      : selectedConversation.platform_user_id ||
+        selectedConversation.conversation_id?.split(':')[1];
     if (!recipient) {
       alert('Conversation is missing platform_user_id; cannot send.');
       return;
@@ -126,6 +156,40 @@ const Inbox = () => {
     }
   };
 
+  const handleAskAi = async () => {
+    if (!selectedConversation) return;
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.sender === 'user');
+
+    setAiLoading(true);
+    try {
+      const res = await api.post('/api/ai/assist', {
+        conversation_id: selectedConversation.conversation_id,
+        channel: selectedConversation.channel,
+        language: lastUserMessage?.metadata?.language || 'auto',
+        message_text:
+          lastUserMessage?.text ||
+          messages[messages.length - 1]?.text ||
+          'Hello',
+        history: messages.slice(-10)
+      });
+      setAiResponse(res.data);
+    } catch (error) {
+      alert(
+        error.response?.data?.error ||
+          'AI assistant unavailable. Check backend logs.'
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleInventorySubmit = async (event) => {
+    event.preventDefault();
+    await loadInventory(inventorySearch);
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -146,7 +210,9 @@ const Inbox = () => {
             >
               <strong>{conversation.platform_user_id || 'Unknown user'}</strong>
               <small>{conversation.channel}</small>
-              <small>{conversation.last_message || 'Waiting for first message'}</small>
+              <small>
+                {conversation.last_message || 'Waiting for first message'}
+              </small>
             </li>
           ))}
           {conversations.length === 0 && (
@@ -179,9 +245,17 @@ const Inbox = () => {
                     {formatTimestamp(message.timestamp || message.created_at)}
                   </small>
                   <div>{message.text || `[${message.type}]`}</div>
-                  {message.attachments?.map((attachment) => (
-                    <div key={attachment.url}>
-                      <a href={attachment.url} target="_blank" rel="noreferrer">
+                  {message.attachments?.map((attachment, index) => (
+                    <div key={`${attachment.url || attachment.obsKey || index}`}>
+                      <a
+                        href={
+                          attachment.signed_url ||
+                          attachment.url ||
+                          attachment.obsKey
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         {attachment.type} attachment
                       </a>
                     </div>
@@ -211,6 +285,106 @@ const Inbox = () => {
           <div className="empty-state">Select a conversation to begin.</div>
         )}
       </main>
+      <aside className="insights-pane">
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <h3>AI Copilot</h3>
+            <button
+              type="button"
+              className="primary"
+              onClick={handleAskAi}
+              disabled={!selectedConversation || aiLoading}
+            >
+              {aiLoading ? 'Thinking…' : 'Run assist'}
+            </button>
+          </div>
+          {aiResponse ? (
+            <>
+              <p className="ai-text">{aiResponse.reply_text}</p>
+              {Array.isArray(aiResponse.suggested_products) &&
+                aiResponse.suggested_products.length > 0 && (
+                  <div className="ai-section">
+                    <h4>Suggested items</h4>
+                    <ul>
+                      {aiResponse.suggested_products.map((item, idx) => (
+                        <li key={`${item.sku || idx}`}>
+                          <strong>{item.name || item.sku}</strong>
+                          {item.price && (
+                            <span>
+                              {' '}
+                              · {item.price} {item.currency || ''}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              {aiResponse.actions && (
+                <p className="ai-metadata">
+                  Actions: {aiResponse.actions.join(', ')}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="ai-placeholder">
+              Trigger the copilot to draft a response, recommend upsells, or
+              create orders automatically.
+            </p>
+          )}
+        </div>
+
+        <div className="ai-card">
+          <h3>Orders</h3>
+          {orders.length === 0 ? (
+            <p className="ai-placeholder">No orders yet for this conversation.</p>
+          ) : (
+            <ul className="list">
+              {orders.map((order) => (
+                <li key={order.id}>
+                  <div className="list-title">
+                    #{order.order_number} · {order.status}
+                  </div>
+                  <div className="list-subtitle">
+                    {formatTimestamp(order.created_at)} ·{' '}
+                    {order.total?.toString()} {order.currency || ''}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="ai-card">
+          <h3>Inventory</h3>
+          <form className="inventory-search" onSubmit={handleInventorySubmit}>
+            <input
+              value={inventorySearch}
+              onChange={(event) => setInventorySearch(event.target.value)}
+              placeholder="Search SKU or name"
+            />
+            <button type="submit">Search</button>
+          </form>
+          {inventory.length === 0 ? (
+            <p className="ai-placeholder">
+              No inventory items found. Seed TaurusDB to preview items.
+            </p>
+          ) : (
+            <ul className="list">
+              {inventory.slice(0, 8).map((item) => (
+                <li key={item.id}>
+                  <div className="list-title">
+                    {item.name} ({item.sku})
+                  </div>
+                  <div className="list-subtitle">
+                    {item.price} {item.currency} · Stock {item.stock}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </aside>
     </div>
   );
 };

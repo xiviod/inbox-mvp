@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
+const { pushLog } = require('./services/ltsClient');
 
 fs.mkdirSync(config.loggingDir, { recursive: true });
 
@@ -20,6 +21,7 @@ function log(event, details = {}) {
       console.error('Failed to write log file entry', err);
     }
   });
+  pushLog(entry);
 }
 
 function getRecentLogs(limit = 50) {

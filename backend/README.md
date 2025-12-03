@@ -1,6 +1,6 @@
 # Backend – Unified Inbox MVP
 
-Node.js + Express + Prisma service that ingests Meta webhooks, stores canonical messages in Postgres, emits Socket.IO updates, and exposes APIs for the frontend + agents.
+Node.js + Express + Prisma service that ingests Meta (WhatsApp/Instagram/Messenger) webhooks plus Telegram Bot API updates, stores canonical messages in **Huawei Cloud TaurusDB (MySQL compatible)**, emits Socket.IO updates, and exposes APIs for the frontend + agents. The service integrates with Huawei OBS for media, DCS (Redis) for caching, ModelArts Studio for AI copilots, and Log Tank Service for centralized logging.
 
 ## Prerequisites
 
@@ -10,19 +10,25 @@ Node.js + Express + Prisma service that ingests Meta webhooks, stores canonical 
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in the secrets from Meta:
+Copy `.env.example` to `.env` and fill in the secrets from Meta and Huawei Cloud:
 
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | HTTP port (default 4000) |
-| `DATABASE_URL` | Postgres connection string |
+| `DATABASE_URL` | TaurusDB (MySQL) connection string |
 | `WEBHOOK_VERIFY_TOKEN` | Token configured in Meta App webhook settings |
 | `FB_APP_SECRET` | Meta App secret for signature validation |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Business phone number id |
 | `WHATSAPP_TOKEN` | WhatsApp Cloud API token |
 | `FB_PAGE_ACCESS_TOKEN` | Page token for Instagram + Messenger messaging |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
+| `TELEGRAM_WEBHOOK_SECRET` | Optional secret token validated on incoming Telegram webhooks |
 | `FRONTEND_ORIGIN` | Allowed Socket.IO/CORS origin |
 | `GRAPH_API_VERSION` | Meta Graph API version (default `v19.0`) |
+| `OBS_*` | OBS endpoint, region, bucket, AK/SK |
+| `DCS_REDIS_*` | DCS (Redis) connection details |
+| `AI_ASSIST_*` | ModelArts AI copilot endpoint + token |
+| `LTS_*` | Log Tank Service configuration (optional) |
 
 ## Local development
 
@@ -34,15 +40,17 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-### Docker + Postgres
+### Docker + TaurusDB (local dev)
 
 ```bash
 cd backend
 cp .env.example .env  # edit values
+# update DATABASE_URL to point at a running MySQL/TaurusDB instance
 docker compose up --build
 ```
 
-Compose starts Postgres (`postgres://postgres:postgres@localhost:5432/inbox`) and the API on `http://localhost:4000`.
+> The provided `docker-compose.yml` keeps a local Postgres service for quick prototyping.  
+> When deploying to Huawei Cloud replace it with TaurusDB and update `DATABASE_URL`.
 
 ### Ngrok helper
 
@@ -56,6 +64,7 @@ Use the public URL to register these webhook endpoints inside Meta App → Webho
 - `POST https://<ngrok>.ngrok.io/webhook/whatsapp`
 - `POST https://<ngrok>.ngrok.io/webhook/instagram`
 - `POST https://<ngrok>.ngrok.io/webhook/messenger`
+- `POST https://<ngrok>.ngrok.io/webhook/telegram` (configure via `https://api.telegram.org/bot<token>/setWebhook?url=https://<ngrok>.ngrok.io/webhook/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>`)
 
 Set the verify token to `WEBHOOK_VERIFY_TOKEN`.
 
@@ -72,6 +81,7 @@ Set the verify token to `WEBHOOK_VERIFY_TOKEN`.
 | WhatsApp | `messages[].from`, `messages[].id`, `messages[].timestamp`, `messages[].text/image/video` | `platform_user_id`, `message_id`, `timestamp`, `text/attachments` |
 | Instagram | `entry[].messaging[].sender.id`, `.message.mid`, `.message.text` | `platform_user_id`, `message_id`, `text` |
 | Messenger | `entry[].messaging[].sender.id`, `.message.mid`, `.message.attachments` | `platform_user_id`, `message_id`, `attachments` |
+| Telegram | `message.chat.id`, `message.from.id`, `message.message_id`, `message.text/photo/document` | `conversation_id`, `platform_user_id`, `message_id`, `text/attachments` |
 
 The raw event (message/status/postback) is stored verbatim in `messages.metadata.raw`.
 
@@ -86,14 +96,17 @@ The raw event (message/status/postback) is stored verbatim in `messages.metadata
 1. Start the stack (`npm run dev` or `docker compose up`)
 2. Run `ngrok http 4000`
 3. Register webhook URLs with Meta
-4. Use the provided `simulate_webhooks.sh` script (from repo root) to send sample payloads; it signs payloads with `FB_APP_SECRET` automatically.
+4. Use the provided `simulate_webhooks.sh` script (from repo root) to send sample payloads; Meta payloads are signed automatically and Telegram payloads include the `TELEGRAM_WEBHOOK_SECRET`.
 
 ## API overview
 
 - `GET /api/conversations` – latest conversations
-- `GET /api/conversations/:conversationId/messages` – history for a conversation
+- `GET /api/conversations/:conversationId/messages` – history for a conversation (OBS signed URLs auto-injected)
 - `POST /api/send` – send an outbound message via the correct adapter
-- `GET /admin/logs?limit=50` – most recent log entries
+- `POST /api/ai/assist` – invoke the ModelArts copilot and persist the suggestion
+- `GET /api/inventory` / `POST /api/inventory` – manage TaurusDB inventory catalog
+- `GET /api/orders` / `POST /api/orders` – sync orders generated by the AI workflow
+- `GET /admin/logs?limit=50` – most recent log entries (mirrored to LTS when configured)
 
-All endpoints return `429` if rate-limited and `401` if webhook signatures do not match.
+All endpoints return `429` if rate-limited and `401` if webhook signatures do not match. OBS/DCS/AI features are automatically disabled when their environment variables are absent.
 

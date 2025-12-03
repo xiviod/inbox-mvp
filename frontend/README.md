@@ -1,6 +1,6 @@
 # Frontend – Live Inbox Demo
 
-Minimal React (Vite) client that shows conversations, loads message history, connects to Socket.IO for real-time updates, and lets an agent send replies via `/api/send`.
+Minimal React (Vite) client that shows conversations, loads message history, connects to Socket.IO for real-time updates, and now surfaces AI copilots, inventory data, and order status from Huawei Cloud services.
 
 ## Setup
 
@@ -22,9 +22,12 @@ The development server proxies `/api` calls to `VITE_BACKEND_URL` (defaults to `
 ## Features
 
 - Conversation list synced with backend `/api/conversations`
-- Message history per conversation
+- Message history with OBS-signed attachment URLs
 - Real-time Socket.IO stream (`message.new`)
 - Composer posting to `/api/send`
+- AI copilot panel (calls `/api/ai/assist`) with upsell recommendations
+- Orders panel powered by TaurusDB (`/api/orders`)
+- Inventory search backed by TaurusDB + OBS imagery (`/api/inventory`)
 
 ## Build
 

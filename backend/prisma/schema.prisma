@@ -3,32 +3,34 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model Conversation {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  conversation_id  String    @unique
-  channel          String
-  platform_user_id String?
-  last_message     String?
+  id               String    @id @default(uuid()) @db.Char(36)
+  conversation_id  String    @unique @db.VarChar(191)
+  channel          String    @db.VarChar(64)
+  platform_user_id String?   @db.VarChar(191)
+  last_message     String?   @db.Text
   last_ts          DateTime? @map("last_ts")
-  assigned_agent   String?
+  assigned_agent   String?   @db.VarChar(191)
   created_at       DateTime  @default(now())
   messages         Message[]
+  orders           Order[]
 
   @@index([channel], map: "idx_conv_channel")
+  @@map("conversations")
 }
 
 model Message {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  conversation_id String?
-  message_id      String?    @unique
-  channel         String
-  sender          String
-  type            String?
-  text            String?
+  id              String     @id @default(uuid()) @db.Char(36)
+  conversation_id String?    @db.VarChar(191)
+  message_id      String?    @unique @db.VarChar(191)
+  channel         String     @db.VarChar(64)
+  sender          String     @db.VarChar(64)
+  type            String?    @db.VarChar(64)
+  text            String?    @db.Text
   attachments     Json?
   metadata        Json?
   timestamp       DateTime?
@@ -37,5 +39,62 @@ model Message {
   conversation Conversation? @relation(fields: [conversation_id], references: [conversation_id], onDelete: Cascade)
 
   @@index([conversation_id], map: "idx_msg_conv")
+  @@map("messages")
+}
+
+model InventoryItem {
+  id          String       @id @default(uuid()) @db.Char(36)
+  sku         String       @unique @db.VarChar(128)
+  name        String       @db.VarChar(255)
+  description String?      @db.Text
+  price       Decimal      @db.Decimal(10, 2)
+  currency    String       @db.VarChar(8)
+  stock       Int          @default(0)
+  attributes  Json?
+  image_url   String?      @db.VarChar(512)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  orderItems  OrderItem[]
+
+  @@map("inventory_items")
+  @@index([sku], map: "idx_inventory_sku")
+}
+
+model Order {
+  id               String       @id @default(uuid()) @db.Char(36)
+  order_number     String       @unique @db.VarChar(64)
+  conversation_id  String?      @db.VarChar(191)
+  channel          String?      @db.VarChar(64)
+  customer_name    String?      @db.VarChar(191)
+  customer_contact String?      @db.VarChar(191)
+  status           String       @default("pending") @db.VarChar(32)
+  total            Decimal?     @db.Decimal(10, 2)
+  currency         String?      @db.VarChar(8)
+  metadata         Json?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+  items            OrderItem[]
+  conversation     Conversation? @relation(fields: [conversation_id], references: [conversation_id], onDelete: SetNull)
+
+  @@map("orders")
+  @@index([conversation_id], map: "idx_order_conversation")
+  @@index([status], map: "idx_order_status")
+}
+
+model OrderItem {
+  id           String       @id @default(uuid()) @db.Char(36)
+  order_id     String       @db.Char(36)
+  inventory_id String       @db.Char(36)
+  quantity     Int          @default(1)
+  unit_price   Decimal?     @db.Decimal(10, 2)
+  metadata     Json?
+  created_at   DateTime     @default(now())
+
+  order     Order         @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  inventory InventoryItem @relation(fields: [inventory_id], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+  @@index([order_id], map: "idx_order_item_order")
+  @@index([inventory_id], map: "idx_order_item_inventory")
 }
 

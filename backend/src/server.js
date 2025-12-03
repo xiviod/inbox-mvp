@@ -13,6 +13,7 @@ const { getRecentLogs } = logger;
 const { prisma } = require('./db/client');
 
 const app = express();
+app.set('trust proxy', 1);
 
 const rawBodySaver = (req, _res, buf) => {
   req.rawBody = Buffer.from(buf);
