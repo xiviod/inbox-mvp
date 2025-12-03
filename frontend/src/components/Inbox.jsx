@@ -2,9 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
-const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
-const api = axios.create({ baseURL: API_BASE });
+const resolveBackendBase = () => {
+  const raw = (import.meta.env.VITE_BACKEND_URL || '').trim();
+  if (!raw || raw === 'self') {
+    return import.meta.env.DEV ? 'http://localhost:4000' : '';
+  }
+  return raw;
+};
+
+const resolveSocketConfig = () => {
+  const raw = (import.meta.env.VITE_SOCKET_URL || '').trim();
+  if (!raw || raw === 'self') {
+    return {
+      url: import.meta.env.DEV ? 'http://localhost:4000' : undefined,
+      path: undefined
+    };
+  }
+  if (raw.startsWith('/')) {
+    return { url: undefined, path: raw };
+  }
+  return { url: raw, path: undefined };
+};
+
+const API_BASE = resolveBackendBase();
+const { url: SOCKET_URL, path: SOCKET_PATH } = resolveSocketConfig();
+const api = axios.create({ baseURL: API_BASE || undefined });
 
 const formatPreview = (message) =>
   message?.text || `[${message?.type || 'event'}]`;
@@ -108,10 +130,14 @@ const Inbox = () => {
   }, [selectedId]);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, {
+    const socketOptions = {
       transports: ['websocket'],
-      withCredentials: true
-    });
+      withCredentials: true,
+      ...(SOCKET_PATH ? { path: SOCKET_PATH } : {})
+    };
+    const socket = SOCKET_URL
+      ? io(SOCKET_URL, socketOptions)
+      : io(socketOptions);
     socket.on('connect', () => setSocketStatus('connected'));
     socket.on('disconnect', () => setSocketStatus('disconnected'));
     socket.on('message.new', (message) => {

@@ -10,14 +10,19 @@ npm install
 npm run dev
 ```
 
-Set `VITE_SOCKET_URL` in a `.env` file if your backend is not at `http://localhost:4000`.
+You can optionally add a `.env` file to override the defaults:
 
 ```env
-VITE_SOCKET_URL=http://localhost:4000
+# Local dev (explicit)
 VITE_BACKEND_URL=http://localhost:4000
+VITE_SOCKET_URL=http://localhost:4000
+
+# Production behind Apache / same-origin proxy
+# VITE_BACKEND_URL=/api
+# VITE_SOCKET_URL=/socket.io
 ```
 
-The development server proxies `/api` calls to `VITE_BACKEND_URL` (defaults to `http://localhost:4000`).
+If you leave these unset in production builds the UI will automatically talk to the same origin that serves the static files. The development server proxies `/api` calls to `VITE_BACKEND_URL` (defaults to `http://localhost:4000`).
 
 ## Features
 
