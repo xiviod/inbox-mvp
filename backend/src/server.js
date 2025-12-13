@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
@@ -12,7 +13,17 @@ const logger = require('./logger');
 const { getRecentLogs } = logger;
 const { prisma } = require('./db/client');
 
+const allowAllOrigins = config.allowAllFrontendOrigins;
+const allowedOrigins = config.frontendOrigins;
+
+const isOriginAllowed = (origin = '') => {
+  if (allowAllOrigins || !origin) return true;
+  const normalized = origin.replace(/\/$/, '');
+  return allowedOrigins.includes(normalized);
+};
+
 const app = express();
+app.set('trust proxy', 1);
 
 const rawBodySaver = (req, _res, buf) => {
   req.rawBody = Buffer.from(buf);
@@ -34,12 +45,33 @@ app.use(
 
 app.use(
   cors({
-    origin: config.frontendOrigin,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
+      }
+      logger.log('cors_blocked', { origin });
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true
   })
 );
-app.use(helmet());
+
+// **Relax helmet so HTTP/mixed content works during setup**
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    hsts: false
+  })
+);
+
 app.use(morgan('combined'));
+
+// serve built frontend
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
 
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -61,8 +93,9 @@ app.get('/admin/logs', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: config.frontendOrigin,
-    methods: ['GET', 'POST']
+    origin: allowAllOrigins ? true : allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -100,4 +133,3 @@ const gracefulShutdown = async () => {
 
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
-

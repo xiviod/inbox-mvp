@@ -3,11 +3,13 @@ const adapters = require('../adapters');
 const logger = require('../logger');
 const config = require('../config');
 const metaSignature = require('../middleware/metaSignature');
+const telegramSecret = require('../middleware/telegramSecret');
 const { processUnifiedMessage } = require('../services/messageService');
+const { maybeAutoReply } = require('../services/autoReplyService');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
+const verifyHandler = (req, res) => {
   const mode = req.query['hub.mode'];
   const verifyToken = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -19,7 +21,12 @@ router.get('/', (req, res) => {
 
   logger.log('webhook_verify_failed', { mode, verifyToken });
   return res.sendStatus(403);
-});
+};
+
+router.get('/', verifyHandler);
+router.get('/whatsapp', verifyHandler);
+router.get('/instagram', verifyHandler);
+router.get('/messenger', verifyHandler);
 
 const inboundHandler =
   (channel) =>
@@ -33,9 +40,14 @@ const inboundHandler =
       const unifiedMessages = adapter.parseIncoming(req.body || {});
       const io = req.app.get('io');
 
-      await Promise.all(
-        unifiedMessages.map((message) => processUnifiedMessage(message, io))
-      );
+      // Persist quickly (Telegram expects a fast 200); AI auto-replies happen async.
+      for (const message of unifiedMessages) {
+        // Ensure channel matches the route (defensive)
+        message.channel = channel;
+        await processUnifiedMessage(message, io);
+        // Fire-and-forget auto reply for user messages
+        void maybeAutoReply(message, io);
+      }
 
       logger.log('webhook_processed', {
         channel,
@@ -55,6 +67,7 @@ const inboundHandler =
 router.post('/whatsapp', metaSignature, inboundHandler('whatsapp'));
 router.post('/instagram', metaSignature, inboundHandler('instagram'));
 router.post('/messenger', metaSignature, inboundHandler('messenger'));
+router.post('/telegram', telegramSecret, inboundHandler('telegram'));
 
 module.exports = router;
 

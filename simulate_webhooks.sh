@@ -3,6 +3,7 @@ set -euo pipefail
 
 BASE_URL=${BASE_URL:-http://localhost:4000}
 SECRET=${FB_APP_SECRET:-dev-secret}
+TELEGRAM_SECRET=${TELEGRAM_WEBHOOK_SECRET:-dev-telegram-secret}
 
 signature_for() {
   local file=$1
@@ -86,7 +87,25 @@ MESSENGER_PAYLOAD='{
   }]
 }'
 
+TELEGRAM_PAYLOAD='{
+  "update_id": 123456,
+  "message": {
+    "message_id": 42,
+    "date": 1732939200,
+    "chat": { "id": 999888777, "type": "private" },
+    "from": { "id": 999888777, "first_name": "Alice" },
+    "text": "hi from Telegram"
+  }
+}'
+
 post_payload "/webhook/whatsapp" "$WHATSAPP_PAYLOAD"
 post_payload "/webhook/instagram" "$INSTAGRAM_PAYLOAD"
 post_payload "/webhook/messenger" "$MESSENGER_PAYLOAD"
+
+echo "==> POST $BASE_URL/webhook/telegram"
+curl -sS -X POST "$BASE_URL/webhook/telegram" \
+  -H 'Content-Type: application/json' \
+  -H "X-Telegram-Bot-Api-Secret-Token: $TELEGRAM_SECRET" \
+  -d "$TELEGRAM_PAYLOAD"
+echo -e "\n"
 

@@ -54,11 +54,34 @@ body {
   display: flex;
   flex-direction: column;
   background: #0f172a;
+  border-right: 1px solid #1f2937;
 }
 
 .messages-header {
   padding: 16px;
   border-bottom: 1px solid #1f2937;
+}
+
+.reply-mode {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reply-mode .mode {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: transparent;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.reply-mode .mode.active {
+  background: #22d3ee;
+  color: #0f172a;
+  border-color: transparent;
 }
 
 .messages-scroll {
@@ -123,5 +146,119 @@ body {
   margin: auto;
   text-align: center;
   color: #94a3b8;
+}
+
+.insights-pane {
+  width: 320px;
+  background: #111827;
+  border-left: 1px solid #1f2937;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.insights-pane h3 {
+  margin: 0 0 8px;
+}
+
+.ai-card {
+  background: #1e293b;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-card button {
+  border-radius: 8px;
+  border: none;
+  background: #1d4ed8;
+  color: #e2e8f0;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ai-card button:disabled {
+  background: #475569;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: #22d3ee !important;
+  color: #0f172a !important;
+}
+
+.ai-text {
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+.ai-placeholder {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.ai-section h4 {
+  margin: 0 0 4px;
+}
+
+.ai-metadata {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-title {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.list-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.inventory-search {
+  display: flex;
+  gap: 8px;
+}
+
+.inventory-search input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.inventory-search button {
+  border: none;
+  border-radius: 8px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
 }
 
