@@ -268,7 +268,6 @@ const Inbox = () => {
       );
     }
   };
-
   const handleInventorySubmit = async (event) => {
     event.preventDefault();
     await loadInventory(inventorySearch);

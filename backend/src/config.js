@@ -65,7 +65,6 @@ if (missingRecommended.length) {
 }
 
 const frontendOriginConfig = normalizeOrigins(process.env.FRONTEND_ORIGIN);
-
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 4000,
