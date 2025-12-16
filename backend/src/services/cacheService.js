@@ -6,17 +6,24 @@ let client;
 
 function getClient() {
   if (client) return client;
-  if (!config.cache.host) {
+  // Treat common placeholder values as "not configured"
+  const host = (config.cache.host || '').trim();
+  if (!host || host === 'redis-host') {
     logger.log('cache_disabled', { reason: 'missing_host' });
     return null;
   }
 
   const options = {
-    host: config.cache.host,
+    host,
     port: config.cache.port,
     password: config.cache.password || undefined,
     enableReadyCheck: true,
-    lazyConnect: true
+    lazyConnect: true,
+    // Don't let Redis issues break the app.
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+    retryStrategy: () => null,
+    reconnectOnError: () => false
   };
 
   if (config.cache.tls) {
@@ -41,12 +48,17 @@ function getClient() {
 async function getJSON(key) {
   const redis = getClient();
   if (!redis) return null;
-  const raw = await redis.get(key);
-  if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      logger.log('cache_parse_error', { key, error: error.message });
+      return null;
+    }
   } catch (error) {
-    logger.log('cache_parse_error', { key, error: error.message });
+    logger.log('cache_get_error', { key, error: error.message });
     return null;
   }
 }

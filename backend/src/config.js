@@ -65,6 +65,7 @@ if (missingRecommended.length) {
 }
 
 const frontendOriginConfig = normalizeOrigins(process.env.FRONTEND_ORIGIN);
+
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 4000,
@@ -103,7 +104,13 @@ module.exports = {
     endpoint: process.env.AI_ASSIST_ENDPOINT || '',
     version: process.env.AI_ASSIST_VERSION || 'latest',
     token: process.env.AI_ASSIST_TOKEN || '',
-    timeoutMs: Number(process.env.AI_ASSIST_TIMEOUT_MS) || 15000
+    stage: process.env.AI_ASSIST_STAGE || '',
+    consoleCookie: process.env.AI_ASSIST_CONSOLE_COOKIE || '',
+    consoleCftk: process.env.AI_ASSIST_CONSOLE_CFTK || '',
+    consoleInvokeMode: process.env.AI_ASSIST_CONSOLE_INVOKE_MODE || 'DEBUG',
+    consoleLanguage: process.env.AI_ASSIST_CONSOLE_LANGUAGE || 'en-us',
+    // ModelArts Studio workflows can take 60-120s depending on model/tool calls.
+    timeoutMs: Number(process.env.AI_ASSIST_TIMEOUT_MS) || 120000
   },
   lts: {
     enabled: process.env.LTS_ENABLED === 'true',

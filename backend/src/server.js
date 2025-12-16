@@ -112,9 +112,29 @@ io.on('connection', (socket) => {
   });
 });
 
-app.use((err, _req, res, _next) => {
-  logger.log('server_error', { error: err.message });
-  res.status(500).json({ error: 'Internal server error' });
+app.use((err, req, res, _next) => {
+  const requestId = `err-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+
+  logger.log('server_error', {
+    request_id: requestId,
+    method: req.method,
+    path: req.originalUrl,
+    error: err.message,
+    stack: err.stack
+  });
+
+  const safeMessage =
+    config.env && String(config.env).toLowerCase() === 'production'
+      ? undefined
+      : err.message;
+
+  res.status(500).json({
+    error: 'Internal server error',
+    request_id: requestId,
+    ...(safeMessage ? { message: safeMessage } : {})
+  });
 });
 
 const start = () => {
